@@ -1,0 +1,6 @@
+stb_image_write 200 20d314d5b682d362
+stb_image_write 400 fb4fd9fab31c31bc
+stb_image_write pixels: 1412862; bytes of .png: 1350439, .bmp: 4655436, .jpg: 1077448, zlib: 604940
+stb_image_write 200 870030850257f4ca
+stb_image_write 400 762b9964b6a55341
+stb_image_write pixels: 1433351; bytes of .png: 1417489, .bmp: 4771404, .jpg: 1077678, zlib: 844360

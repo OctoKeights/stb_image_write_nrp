@@ -1,0 +1,16 @@
+[package]
+name = "stb_image_write_nrp"
+description = "PNG, BMP and JPEG writers in pure, safe Rust: a native port of stb_image_write.h, giving the bytes it writes."
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.100"
+license = "MIT OR Unlicense"
+repository = "https://github.com/OctoKeights/stb_image_write_nrp"
+readme = "README.md"
+keywords = ["png", "jpeg", "bmp", "image", "stb"]
+categories = ["multimedia::images", "encoding"]
+
+[dependencies]
+
+[dev-dependencies]
+miniz_nrp = { version = "0.1.0", git = "https://github.com/OctoKeights/miniz_nrp" }
