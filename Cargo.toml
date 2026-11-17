@@ -1,7 +1,7 @@
 [package]
 name = "stb_image_write_nrp"
-description = "PNG, BMP and JPEG writers in pure, safe Rust: a native port of stb_image_write.h, giving the bytes it writes."
-version = "0.1.0"
+description = "PNG, BMP and JPEG writers in pure, safe Rust: a native port of stb_image_write.h, bit-identical to it."
+version = "0.2.0"
 edition = "2024"
 rust-version = "1.100"
 license = "MIT OR Unlicense"

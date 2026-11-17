@@ -1,13 +1,14 @@
 # Recorded results
 
-`stb_image_write_expected.txt` is what stb_image_write.h makes of made-up images, as
-`compare/dump_stb_image_write.c` prints it; `tests/golden.rs` checks that the port prints the
-same. To make it again, run the comparison once (it builds the original's side), then that by
-itself:
+`stb_image_write_expected.txt` holds the hashes `compare/dump_stb_image_write.c` prints when
+built against `stb_image_write.h` v1.18, for synthetic images. `tests/golden.rs` checks that
+stb_image_write_nrp prints the same.
+
+To record them again, run the comparison once, which builds the original's side, then run
+that program directly:
 
     compare/compare.sh <checkout of stb> 3000 1
     ref="${TMPDIR:-/tmp}/stb_image_write_nrp-compare/dump-stb-image-write"
     { "$ref" stb_image_write 5 400; "$ref" stb_image_write 12 400; } > tests/data/stb_image_write_expected.txt
 
-No picture or file from anywhere is in this repository: every file and stream the tests and
-the comparison use is made up from a seed.
+All test data is generated from seeds; no external files are used.

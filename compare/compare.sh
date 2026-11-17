@@ -5,8 +5,8 @@
 #
 # compare/dump_stb_image_write.c is built against its stb_image_write.h, without contraction of a
 # multiply and an add (its JPEG writer works in floats), and examples/dump.rs from the port; both
-# run the same made-up images for each seed and what they print is compared byte for byte.
-# Dump: stb_image_write, with a tenth of [count] (200,000 by default) as the number of made-up
+# run the same synthetic images for each seed and what they print is compared byte for byte.
+# Dump: stb_image_write, with a tenth of [count] (200,000 by default) as the number of synthetic
 # images, each written as .png, .bmp and .jpg.
 set -u
 if [ $# -lt 1 ]; then

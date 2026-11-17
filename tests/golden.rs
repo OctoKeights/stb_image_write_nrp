@@ -1,11 +1,11 @@
-//! The port of stb_image_write.h against results recorded from the original, so that a change
-//! shows without a C compiler at hand.
+//! stb_image_write_nrp against hashes recorded from `stb_image_write.h`, so that any change in
+//! output shows without a C compiler.
 //!
 //! `tests/data/stb_image_write_expected.txt` is what `compare/dump_stb_image_write.c`, built
-//! against stb (see `compare/compare.sh`), prints for `stb_image_write 5 400` and
-//! `stb_image_write 12 400`: a hash of the `.png`, `.bmp` and `.jpg` files made-up images are
-//! written as, with made-up settings, and of what made-up data comes to in its zlib
-//! compressor. `compare/compare.sh` is the full comparison.
+//! against stb_image_write.h v1.18, prints for `stb_image_write 5 400` and
+//! `stb_image_write 12 400`: hashes of the PNG, BMP and JPEG files of synthetic images, with
+//! random settings, and of synthetic data through the PNG writer's zlib compressor.
+//! `compare/compare.sh` runs the full comparison.
 
 mod made_up;
 
