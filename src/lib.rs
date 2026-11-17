@@ -1222,10 +1222,7 @@ mod tests {
                     // (The original writes no block at all for no bytes.)
                     assert_eq!(packed, [0x78, 0x5e, 0, 0, 0, 1]);
                 } else {
-                    assert_eq!(
-                        miniz::uncompress(&packed, data.len()).as_deref(),
-                        Some(data)
-                    );
+                    assert_eq!(miniz::decompress(&packed, data.len()).as_deref(), Ok(data));
                 }
             }
         }
@@ -1261,7 +1258,7 @@ mod tests {
             // The rows come back out of the compressed chunk, each behind its filter.
             let length = u32::from_be_bytes(file[33..37].try_into().unwrap()) as usize;
             assert_eq!(&file[37..41], b"IDAT");
-            let rows = miniz::uncompress(&file[41..41 + length], 7 * (13 * comp + 1)).unwrap();
+            let rows = miniz::decompress(&file[41..41 + length], 7 * (13 * comp + 1)).unwrap();
             assert_eq!(rows.len(), 7 * (13 * comp + 1));
             // Unfiltered, they are the pixels.
             let plain = write_png(
@@ -1277,7 +1274,7 @@ mod tests {
             )
             .unwrap();
             let length = u32::from_be_bytes(plain[33..37].try_into().unwrap()) as usize;
-            let rows = miniz::uncompress(&plain[41..41 + length], 7 * (13 * comp + 1)).unwrap();
+            let rows = miniz::decompress(&plain[41..41 + length], 7 * (13 * comp + 1)).unwrap();
             for (row, line) in rows.chunks(13 * comp + 1).enumerate() {
                 assert_eq!(
                     (line[0], &line[1..]),
