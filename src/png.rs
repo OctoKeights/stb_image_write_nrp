@@ -127,8 +127,7 @@ fn filter_row(out: &mut [u8], row: &[u8], up: Option<&[u8]>, n: usize, filter: P
                 out[i] = row[i].wrapping_sub(up[i] >> 1);
             }
             for i in n..row.len() {
-                let average = (u16::from(row[i - n]) + u16::from(up[i])) >> 1;
-                out[i] = row[i].wrapping_sub(average as u8);
+                out[i] = row[i].wrapping_sub(row[i - n].midpoint(up[i]));
             }
         }
         PngFilter::Paeth => {
