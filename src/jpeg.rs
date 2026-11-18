@@ -19,7 +19,20 @@ type HuffmanTable = [[u16; 2]; 256];
 ///
 /// `quality` goes from 1 (smallest) to 100 (best); 0 means 90, and above 100 counts as 100.
 /// Up to 90, the colour is stored at half the resolution each way. Alpha is not written.
+#[must_use]
 pub fn write_jpg(image: &Image, quality: u8, options: &WriteOptions) -> Vec<u8> {
+    // The quantisation as factors, with the DCT's scaling folded in.
+    #[allow(clippy::excessive_precision)]
+    const AASF: [f32; 8] = [
+        1.0 * 2.828_427_125,
+        1.387_039_845 * 2.828_427_125,
+        1.306_562_965 * 2.828_427_125,
+        1.175_875_602 * 2.828_427_125,
+        1.0 * 2.828_427_125,
+        0.785_694_958 * 2.828_427_125,
+        0.541_196_100 * 2.828_427_125,
+        0.275_899_379 * 2.828_427_125,
+    ];
     let quality = if quality == 0 { 90 } else { i32::from(quality) };
     let subsample = quality <= 90;
     let quality = quality.clamp(1, 100);
@@ -35,18 +48,6 @@ pub fn write_jpg(image: &Image, quality: u8, options: &WriteOptions) -> Vec<u8> 
         y_table[zigzag] = ((YQT[i] * scale + 50) / 100).clamp(1, 255) as u8;
         uv_table[zigzag] = ((UVQT[i] * scale + 50) / 100).clamp(1, 255) as u8;
     }
-    // The quantisation as factors, with the DCT's scaling folded in.
-    #[allow(clippy::excessive_precision)]
-    const AASF: [f32; 8] = [
-        1.0 * 2.828427125,
-        1.387039845 * 2.828427125,
-        1.306562965 * 2.828427125,
-        1.175875602 * 2.828427125,
-        1.0 * 2.828427125,
-        0.785694958 * 2.828427125,
-        0.541196100 * 2.828427125,
-        0.275899379 * 2.828427125,
-    ];
     let (mut y_factors, mut uv_factors) = ([0.0f32; 64], [0.0f32; 64]);
     for k in 0..64 {
         let (row, col) = (k / 8, k % 8);
@@ -77,12 +78,12 @@ pub fn write_jpg(image: &Image, quality: u8, options: &WriteOptions) -> Vec<u8> 
         // averaged from four pixels to one.
         for top in (0..height).step_by(16) {
             for left in (0..width).step_by(16) {
-                let (mut ys, mut us, mut vs) = ([0.0f32; 256], [0.0f32; 256], [0.0f32; 256]);
-                to_ycbcr(image, options, left, top, 16, &mut ys, &mut us, &mut vs);
+                let mut planes = Planes::<256>::of(image, options.flip_vertically, left, top);
                 for at in [0, 8, 128, 136] {
-                    y.encode(&mut bits, &mut ys[at..], 16);
+                    y.encode(&mut bits, &mut planes.y[at..], 16);
                 }
                 let (mut sub_u, mut sub_v) = ([0.0f32; 64], [0.0f32; 64]);
+                let (us, vs) = (&planes.cb, &planes.cr);
                 for (pos, (su, sv)) in sub_u.iter_mut().zip(&mut sub_v).enumerate() {
                     let j = pos / 8 * 32 + pos % 8 * 2;
                     *su = (us[j] + us[j + 1] + us[j + 16] + us[j + 17]) * 0.25;
@@ -95,11 +96,10 @@ pub fn write_jpg(image: &Image, quality: u8, options: &WriteOptions) -> Vec<u8> 
     } else {
         for top in (0..height).step_by(8) {
             for left in (0..width).step_by(8) {
-                let (mut ys, mut us, mut vs) = ([0.0f32; 64], [0.0f32; 64], [0.0f32; 64]);
-                to_ycbcr(image, options, left, top, 8, &mut ys, &mut us, &mut vs);
-                y.encode(&mut bits, &mut ys, 8);
-                u.encode(&mut bits, &mut us, 8);
-                v.encode(&mut bits, &mut vs, 8);
+                let mut planes = Planes::<64>::of(image, options.flip_vertically, left, top);
+                y.encode(&mut bits, &mut planes.y, 8);
+                u.encode(&mut bits, &mut planes.cb, 8);
+                v.encode(&mut bits, &mut planes.cr, 8);
             }
         }
     }
@@ -151,38 +151,44 @@ fn write_headers(
     out.extend_from_slice(&SOS);
 }
 
-/// The Y, Cb and Cr of the `size` by `size` pixels from (`left`, `top`), the last row and
-/// column repeated past the image's edges.
-#[allow(clippy::too_many_arguments)]
-fn to_ycbcr(
-    image: &Image,
-    options: &WriteOptions,
-    left: usize,
-    top: usize,
-    size: usize,
-    ys: &mut [f32],
-    us: &mut [f32],
-    vs: &mut [f32],
-) {
-    let (width, height) = (image.width as usize, image.height as usize);
-    let n = image.channels.count();
-    // Grey with or without alpha has the one value for all three.
-    let (g, b) = if n > 2 { (1, 2) } else { (0, 0) };
-    let mut pos = 0;
-    for y in top..top + size {
-        let row = image.file_row(y.min(height - 1), options.flip_vertically);
-        for x in left..left + size {
-            let p = x.min(width - 1) * n;
-            let (r, g, b) = (
-                f32::from(row[p]),
-                f32::from(row[p + g]),
-                f32::from(row[p + b]),
-            );
-            ys[pos] = 0.29900 * r + 0.58700 * g + 0.11400 * b - 128.0;
-            us[pos] = -0.16874 * r - 0.33126 * g + 0.50000 * b;
-            vs[pos] = 0.50000 * r - 0.41869 * g - 0.08131 * b;
-            pos += 1;
+/// The Y, Cb and Cr of a square of `LEN` pixels (8 by 8, or 16 by 16), row by row.
+struct Planes<const LEN: usize> {
+    y: [f32; LEN],
+    cb: [f32; LEN],
+    cr: [f32; LEN],
+}
+
+impl<const LEN: usize> Planes<LEN> {
+    /// The square from (`left`, `top`), the last row and column repeated past the image's
+    /// edges.
+    fn of(image: &Image, flip_vertically: bool, left: usize, top: usize) -> Self {
+        let size = LEN.isqrt();
+        let (width, height) = (image.width as usize, image.height as usize);
+        let channels = image.channels.count();
+        // Grey with or without alpha has the one value for all three.
+        let (green_at, blue_at) = if channels > 2 { (1, 2) } else { (0, 0) };
+        let mut planes = Self {
+            y: [0.0; LEN],
+            cb: [0.0; LEN],
+            cr: [0.0; LEN],
+        };
+        let mut pos = 0;
+        for y in top..top + size {
+            let row = image.file_row(y.min(height - 1), flip_vertically);
+            for x in left..left + size {
+                let at = x.min(width - 1) * channels;
+                let (r, g, b) = (
+                    f32::from(row[at]),
+                    f32::from(row[at + green_at]),
+                    f32::from(row[at + blue_at]),
+                );
+                planes.y[pos] = 0.29900 * r + 0.58700 * g + 0.11400 * b - 128.0;
+                planes.cb[pos] = -0.16874 * r - 0.33126 * g + 0.50000 * b;
+                planes.cr[pos] = 0.50000 * r - 0.41869 * g - 0.08131 * b;
+                pos += 1;
+            }
         }
+        planes
     }
 }
 
@@ -268,7 +274,13 @@ fn magnitude(value: i32) -> [u16; 2] {
 
 /// The forward DCT of eight values of `d`, `step` apart from `at`, in place (AAN, as in the
 /// IJG's `jfdctflt.c`; `stbiw__jpg_DCT`).
-#[allow(clippy::excessive_precision, clippy::approx_constant)]
+// (The constants are the published ones, to the digits the C has, and the names are the
+// algorithm's: `tmp0` to `tmp13` and `z1` to `z13`.)
+#[allow(
+    clippy::excessive_precision,
+    clippy::approx_constant,
+    clippy::similar_names
+)]
 fn dct(d: &mut [f32], at: usize, step: usize) {
     let i = |k: usize| at + step * k;
     let (d0, d1, d2, d3) = (d[i(0)], d[i(1)], d[i(2)], d[i(3)]);
@@ -288,7 +300,7 @@ fn dct(d: &mut [f32], at: usize, step: usize) {
     let tmp13 = tmp0 - tmp3;
     let tmp11 = tmp1 + tmp2;
     let tmp12 = tmp1 - tmp2;
-    let z1 = (tmp12 + tmp13) * 0.707106781; // c4
+    let z1 = (tmp12 + tmp13) * 0.707_106_781; // c4
     d[i(0)] = tmp10 + tmp11;
     d[i(4)] = tmp10 - tmp11;
     d[i(2)] = tmp13 + z1;
@@ -300,10 +312,10 @@ fn dct(d: &mut [f32], at: usize, step: usize) {
     let tmp12 = tmp6 + tmp7;
     // (The rotator is modified from figure 4-8 of Pennebaker and Mitchell to avoid extra
     // negations.)
-    let z5 = (tmp10 - tmp12) * 0.382683433; // c6
-    let z2 = tmp10 * 0.541196100 + z5; // c2 - c6
-    let z4 = tmp12 * 1.306562965 + z5; // c2 + c6
-    let z3 = tmp11 * 0.707106781; // c4
+    let z5 = (tmp10 - tmp12) * 0.382_683_433; // c6
+    let z2 = tmp10 * 0.541_196_100 + z5; // c2 - c6
+    let z4 = tmp12 * 1.306_562_965 + z5; // c2 + c6
+    let z3 = tmp11 * 0.707_106_781; // c4
     let z11 = tmp7 + z3;
     let z13 = tmp7 - z3;
     d[i(5)] = z13 + z2;

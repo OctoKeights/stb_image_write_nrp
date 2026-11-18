@@ -1,8 +1,8 @@
-//! The Rust half of the comparison with stb_image_write.h: runs the port over synthetic data and
+//! The Rust half of the comparison with `stb_image_write.h`: runs the port over synthetic data and
 //! prints a running hash of what comes out, as `compare/dump_stb_image_write.c` does with the
 //! original. `compare/compare.sh` compares the two.
 //!
-//!   dump stb_image_write <seed> <count>   synthetic images of one to four channels, of seven
+//!   dump `stb_image_write` <seed> <count>   synthetic images of one to four channels, of seven
 //!                                         kinds and many sizes, some with rows further apart
 //!                                         than they are wide, written as .png (with synthetic
 //!                                         compression levels and filters), as .bmp and as .jpg
@@ -24,11 +24,10 @@ fn main() {
         std::process::exit(2);
     };
     let _ = seed;
-    match what.as_str() {
-        "stb_image_write" => print!("{}", made_up::stb_image_write(seed, count)),
-        _ => {
-            eprintln!("unknown dump {what}");
-            std::process::exit(2);
-        }
+    if what.as_str() == "stb_image_write" {
+        print!("{}", made_up::stb_image_write(seed, count));
+    } else {
+        eprintln!("unknown dump {what}");
+        std::process::exit(2);
     }
 }

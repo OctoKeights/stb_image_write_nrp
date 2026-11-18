@@ -8,6 +8,7 @@ use crate::{Channels, Image, PngFilter, WriteOptions, zlib_compress};
 /// Each row is filtered with [`WriteOptions::png_filter`], or, by default, with whichever of
 /// the five filters leaves the smallest bytes, and the rows are compressed with
 /// [`zlib_compress`] at [`WriteOptions::png_compression_level`].
+#[must_use]
 pub fn write_png(image: &Image, options: &WriteOptions) -> Vec<u8> {
     let n = image.channels.count();
     let row_len = image.width as usize * n;
@@ -19,35 +20,33 @@ pub fn write_png(image: &Image, options: &WriteOptions) -> Vec<u8> {
     for (y, out) in filtered.chunks_exact_mut(row_len + 1).enumerate() {
         let row = image.file_row(y, options.flip_vertically);
         let up = (y > 0).then(|| image.file_row(y - 1, options.flip_vertically));
-        let (filter_byte, line) = out.split_first_mut().unwrap();
-        let filter = match options.png_filter {
-            Some(filter) => {
-                filter_row(line, row, up, n, filter);
-                filter
-            }
-            None => {
-                // The filter whose bytes, as signed values, sum smallest; the first on a tie.
-                let mut best = (PngFilter::None, i32::MAX);
-                for filter in [
-                    PngFilter::None,
-                    PngFilter::Sub,
-                    PngFilter::Up,
-                    PngFilter::Average,
-                    PngFilter::Paeth,
-                ] {
-                    filter_row(&mut candidate, row, up, n, filter);
-                    let estimate = candidate.iter().fold(0i32, |sum, &byte| {
-                        sum.wrapping_add(i32::from(byte as i8).abs())
-                    });
-                    if estimate < best.1 {
-                        best = (filter, estimate);
-                        line.copy_from_slice(&candidate);
-                    }
+        // (A row is its filter's byte, then the filtered bytes.)
+        let (filter_byte, line) = out.split_at_mut(1);
+        let filter = if let Some(filter) = options.png_filter {
+            filter_row(line, row, up, n, filter);
+            filter
+        } else {
+            // The filter whose bytes, as signed values, sum smallest; the first on a tie.
+            let mut best = (PngFilter::None, i32::MAX);
+            for filter in [
+                PngFilter::None,
+                PngFilter::Sub,
+                PngFilter::Up,
+                PngFilter::Average,
+                PngFilter::Paeth,
+            ] {
+                filter_row(&mut candidate, row, up, n, filter);
+                let estimate = candidate.iter().fold(0i32, |sum, &byte| {
+                    sum.wrapping_add(i32::from(byte as i8).abs())
+                });
+                if estimate < best.1 {
+                    best = (filter, estimate);
+                    line.copy_from_slice(&candidate);
                 }
-                best.0
             }
+            best.0
         };
-        *filter_byte = filter as u8;
+        filter_byte[0] = filter as u8;
     }
     let zlib = zlib_compress(&filtered, options.png_compression_level);
     drop(filtered);
@@ -64,17 +63,17 @@ pub fn write_png(image: &Image, options: &WriteOptions) -> Vec<u8> {
         Channels::Rgb => 2,
         Channels::Rgba => 6,
     };
-    write_chunk(&mut out, b"IHDR", &header);
-    write_chunk(&mut out, b"IDAT", &zlib);
-    write_chunk(&mut out, b"IEND", &[]);
+    write_chunk(&mut out, *b"IHDR", &header);
+    write_chunk(&mut out, *b"IDAT", &zlib);
+    write_chunk(&mut out, *b"IEND", &[]);
     out
 }
 
 /// A chunk: its length, its name and its bytes, and the checksum of the last two.
-fn write_chunk(out: &mut Vec<u8>, name: &[u8; 4], bytes: &[u8]) {
+fn write_chunk(out: &mut Vec<u8>, name: [u8; 4], bytes: &[u8]) {
     out.extend_from_slice(&(bytes.len() as u32).to_be_bytes());
     let from = out.len();
-    out.extend_from_slice(name);
+    out.extend_from_slice(&name);
     out.extend_from_slice(bytes);
     let crc = crc32(&out[from..]);
     out.extend_from_slice(&crc.to_be_bytes());

@@ -2,15 +2,10 @@
 //! (`compare/dump_stb_image_write.c`) generates it, and the dump that both the golden tests
 //! and `examples/dump.rs` run.
 
-// (The arithmetic is written as the C side has it; not every user of this module uses all of
-// it.)
-#![allow(
-    clippy::manual_is_multiple_of,
-    clippy::needless_range_loop,
-    clippy::manual_div_ceil,
-    clippy::manual_checked_ops,
-    dead_code
-)]
+// (The golden tests and the dump each use only part of this module.)
+#![allow(dead_code)]
+
+use std::fmt::Write;
 
 use stb_image_write_nrp::{
     Channels, Image, PngFilter, WriteOptions, write_bmp, write_jpg, write_png, zlib_compress,
@@ -26,8 +21,8 @@ impl Random {
     pub fn next(&mut self) -> u32 {
         self.state = self
             .state
-            .wrapping_mul(6364136223846793005)
-            .wrapping_add(1442695040888963407);
+            .wrapping_mul(6_364_136_223_846_793_005)
+            .wrapping_add(1_442_695_040_888_963_407);
         (self.state >> 32) as u32
     }
 }
@@ -40,14 +35,14 @@ pub struct Hash {
 impl Hash {
     pub fn new() -> Hash {
         Hash {
-            value: 14695981039346656037,
+            value: 14_695_981_039_346_656_037,
         }
     }
 
     pub fn add(&mut self, data: &[u8]) {
         for &byte in data {
             self.value ^= u64::from(byte);
-            self.value = self.value.wrapping_mul(1099511628211);
+            self.value = self.value.wrapping_mul(1_099_511_628_211);
         }
     }
 }
@@ -65,7 +60,7 @@ pub fn make_data(r: &mut Random) -> Vec<u8> {
         2 | 3 => r.next() % 5000,
         4 | 5 => r.next() % 40000,
         6 => 60000 + r.next() % 20000,
-        _ => r.next() % 200000,
+        _ => r.next() % 200_000,
     } as usize;
     let kind = r.next() % 8;
     let mut buf = Vec::with_capacity(len);
@@ -111,7 +106,7 @@ pub fn make_data(r: &mut Random) -> Vec<u8> {
         // copies of what came before
         4 => {
             while buf.len() < len {
-                if buf.len() < 64 || r.next() % 4 == 0 {
+                if buf.len() < 64 || r.next().is_multiple_of(4) {
                     buf.push((r.next() >> 9) as u8);
                 } else {
                     let reach = buf.len().min(40000);
@@ -177,7 +172,7 @@ pub fn make_picture(r: &mut Random) -> Picture {
     };
     let (w, h) = (w as usize, h as usize);
     let stride = w * comp
-        + if r.next() % 3 == 0 {
+        + if r.next().is_multiple_of(3) {
             (r.next() % 7) as usize
         } else {
             0
@@ -212,10 +207,10 @@ pub fn make_picture(r: &mut Random) -> Picture {
                     0 => r.next() >> 13,           // noise
                     1 => palette[0][c],            // one colour
                     2 => slope,                    // a slope
-                    3 => palette[pick][c],         // squares
+                    3 | 5 => palette[pick][c],     // squares
                     4 => slope + r.next() % noise, // a slope with noise on it
-                    5 => palette[pick][c],         // a few colours, anywhere
-                    _ => wave(along),              // waves
+                    // a few colours, anywhere
+                    _ => wave(along), // waves
                 };
                 bytes[y * stride + x * comp + c] = value as u8;
             }
@@ -287,17 +282,17 @@ pub fn stb_image_write(seed: u64, count: u32) -> String {
 
         // The three settings, as the C side has them.
         let options = WriteOptions {
-            png_compression_level: if r.next() % 4 == 0 {
+            png_compression_level: if r.next().is_multiple_of(4) {
                 png_level((r.next() % 40) as i32 - 3)
             } else {
                 8
             },
-            png_filter: if r.next() % 3 == 0 {
+            png_filter: if r.next().is_multiple_of(3) {
                 png_filter((r.next() % 8) as i32 - 1)
             } else {
                 None
             },
-            flip_vertically: r.next() % 4 == 0,
+            flip_vertically: r.next().is_multiple_of(4),
         };
         let image = p.image();
 
@@ -326,7 +321,7 @@ pub fn stb_image_write(seed: u64, count: u32) -> String {
 
         if i % 4 == 0 {
             let data = make_data(&mut r);
-            let level = if r.next() % 4 == 0 {
+            let level = if r.next().is_multiple_of(4) {
                 (r.next() % 50) as i32
             } else {
                 8
@@ -338,7 +333,7 @@ pub fn stb_image_write(seed: u64, count: u32) -> String {
         }
 
         if (i + 1) % 200 == 0 || i + 1 == count {
-            out += &format!("stb_image_write {} {:016x}\n", i + 1, hash.value);
+            writeln!(out, "stb_image_write {} {:016x}", i + 1, hash.value).unwrap();
         }
     }
     out + &format!(

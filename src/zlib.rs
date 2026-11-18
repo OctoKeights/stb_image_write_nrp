@@ -37,6 +37,7 @@ const DIST_EXTRA: [u8; 30] = [
 /// let stream = zlib_compress(&b"abcabcabcabc".repeat(100), 8);
 /// assert_eq!(&stream[..2], &[0x78, 0x5E]);
 /// ```
+#[must_use]
 pub fn zlib_compress(data: &[u8], level: u32) -> Vec<u8> {
     let quality = level.max(5) as usize;
     let len = data.len();
@@ -83,38 +84,31 @@ pub fn zlib_compress(data: &[u8], level: u32) -> Vec<u8> {
             }
         }
 
-        match best_at {
-            Some(place) => {
-                let dist = i - place;
-                debug_assert!(dist < WINDOW as usize && best <= MAX_MATCH);
-                let code = LENGTH_BASE[1..]
-                    .iter()
-                    .position(|&b| best < usize::from(b))
-                    .unwrap();
-                z.write_fixed(257 + code as u32);
-                if LENGTH_EXTRA[code] != 0 {
-                    z.write(
-                        (best - usize::from(LENGTH_BASE[code])) as u32,
-                        u32::from(LENGTH_EXTRA[code]),
-                    );
-                }
-                let code = DIST_BASE[1..]
-                    .iter()
-                    .position(|&b| dist < usize::from(b))
-                    .unwrap();
-                z.write(reverse(code as u32, 5), 5);
-                if DIST_EXTRA[code] != 0 {
-                    z.write(
-                        (dist - usize::from(DIST_BASE[code])) as u32,
-                        u32::from(DIST_EXTRA[code]),
-                    );
-                }
-                i += best;
+        if let Some(place) = best_at {
+            let dist = i - place;
+            debug_assert!(dist < WINDOW as usize && best <= MAX_MATCH);
+            // The code is the last whose base is no more than the length (the tables are
+            // sorted, and the length is at most 258).
+            let code = LENGTH_BASE[1..].partition_point(|&base| usize::from(base) <= best);
+            z.write_fixed(257 + code as u32);
+            if LENGTH_EXTRA[code] != 0 {
+                z.write(
+                    (best - usize::from(LENGTH_BASE[code])) as u32,
+                    u32::from(LENGTH_EXTRA[code]),
+                );
             }
-            None => {
-                z.write_literal(data[i]);
-                i += 1;
+            let code = DIST_BASE[1..].partition_point(|&base| usize::from(base) <= dist);
+            z.write(reverse(code as u32, 5), 5);
+            if DIST_EXTRA[code] != 0 {
+                z.write(
+                    (dist - usize::from(DIST_BASE[code])) as u32,
+                    u32::from(DIST_EXTRA[code]),
+                );
             }
+            i += best;
+        } else {
+            z.write_literal(data[i]);
+            i += 1;
         }
     }
     for &byte in &data[i.min(len)..] {
@@ -244,7 +238,7 @@ mod tests {
     #[test]
     fn the_small_zlib_makes_streams_that_decompress() {
         let noise: Vec<u8> = (0..5000u32)
-            .map(|i| (i.wrapping_mul(2654435761) >> 13) as u8)
+            .map(|i| (i.wrapping_mul(2_654_435_761) >> 13) as u8)
             .collect();
         let runs: Vec<u8> = (0..70000u32).map(|i| (i / 300) as u8).collect();
         for data in [&[][..], b"a", b"abc", b"abcabcabcabcabcabc", &noise, &runs] {
@@ -263,8 +257,8 @@ mod tests {
         let big_noise: Vec<u8> = (0..40000)
             .map(|_| {
                 state = state
-                    .wrapping_mul(6364136223846793005)
-                    .wrapping_add(1442695040888963407);
+                    .wrapping_mul(6_364_136_223_846_793_005)
+                    .wrapping_add(1_442_695_040_888_963_407);
                 (state >> 40) as u8
             })
             .collect();

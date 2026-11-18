@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.2.1
+
+- **Stricter lints, enforced in CI.** `Cargo.toml` turns on clippy's pedantic group for every
+  target, and forbids `unsafe` code in the tests, examples and benchmarks as well as the
+  library. `Image::new` and `Image::with_stride` document their errors.
+
+- **No panic paths in the library.** The zlib writer finds its length and distance codes
+  with `partition_point` instead of a search that was unwrapped, and the PNG writer no
+  longer unwraps a row's first byte.
+
+- **Tidier internals.** The JPEG writer's colour conversion returns its Y, Cb and Cr planes
+  as one value instead of filling three buffers passed in, and options small enough to copy
+  are passed by value.
+
+- Output is unchanged, checked against `stb_image_write.h` built with gcc and with clang on
+  18,000 images (63 million pixels), and so is speed.
+
 ## 0.2.0
 
 - **Breaking: an idiomatic API.** The pixels to write are an `Image`, made with

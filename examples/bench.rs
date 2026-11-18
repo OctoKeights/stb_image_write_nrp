@@ -17,8 +17,8 @@ fn photo_like(w: usize, h: usize) -> Vec<u8> {
     for y in 0..h {
         for x in 0..w {
             state = state
-                .wrapping_mul(6364136223846793005)
-                .wrapping_add(1442695040888963407);
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
             let noise = (state >> 61) as usize;
             let flat = (x / 128 + y / 128) % 5 == 0;
             for c in 0..4 {
@@ -61,7 +61,7 @@ fn main() {
             println!(
                 "{name:5} {what:12} {:8.2} Mpixel/s   {len} bytes",
                 megapixels / t
-            )
+            );
         };
         report("png", time(|| write_png(&image, &options).len()));
         report("bmp", time(|| write_bmp(&image, &options).len()));

@@ -7,6 +7,7 @@ use crate::{Channels, Image, WriteOptions};
 /// One to three channels are written as 24 bits a pixel (grey as three equal values, with the
 /// alpha of [`Channels::GreyAlpha`] dropped), and [`Channels::Rgba`] as 32 bits with alpha,
 /// behind a version 4 header.
+#[must_use]
 pub fn write_bmp(image: &Image, options: &WriteOptions) -> Vec<u8> {
     let (width, height) = (image.width, image.height);
     let rgba = image.channels == Channels::Rgba;

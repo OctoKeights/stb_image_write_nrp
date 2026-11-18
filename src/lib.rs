@@ -53,6 +53,7 @@ pub enum Channels {
 
 impl Channels {
     /// The channels for a count of 1 to 4.
+    #[must_use]
     pub const fn from_count(count: u8) -> Option<Channels> {
         match count {
             1 => Some(Channels::Grey),
@@ -64,11 +65,13 @@ impl Channels {
     }
 
     /// The number of channels, which is also the bytes in a pixel.
+    #[must_use]
     pub const fn count(self) -> usize {
         self as usize
     }
 
     /// Whether the last channel is alpha.
+    #[must_use]
     pub const fn has_alpha(self) -> bool {
         matches!(self, Channels::GreyAlpha | Channels::Rgba)
     }
@@ -90,6 +93,10 @@ pub const MAX_DIMENSION: u32 = i32::MAX as u32 / 4;
 
 impl<'a> Image<'a> {
     /// An image whose rows follow one another without gaps.
+    ///
+    /// # Errors
+    ///
+    /// As [`Image::with_stride`] gives them.
     pub fn new(
         pixels: &'a [u8],
         width: u32,
@@ -107,6 +114,13 @@ impl<'a> Image<'a> {
 
     /// An image whose rows start `stride` bytes apart, which may be more than the bytes of a
     /// row; whatever lies between rows is not read.
+    ///
+    /// # Errors
+    ///
+    /// [`ImageError::Empty`] if the width or the height is zero, [`ImageError::TooLarge`] if
+    /// either is above [`MAX_DIMENSION`], [`ImageError::StrideTooShort`] if `stride` is less
+    /// than the bytes of a row, and [`ImageError::NotEnoughPixels`] if `pixels` ends before
+    /// the last row does.
     pub fn with_stride(
         pixels: &'a [u8],
         width: u32,
@@ -140,21 +154,25 @@ impl<'a> Image<'a> {
     }
 
     /// The width in pixels.
+    #[must_use]
     pub fn width(&self) -> u32 {
         self.width
     }
 
     /// The height in pixels.
+    #[must_use]
     pub fn height(&self) -> u32 {
         self.height
     }
 
     /// The channels of each pixel.
+    #[must_use]
     pub fn channels(&self) -> Channels {
         self.channels
     }
 
     /// The bytes from the start of one row to the start of the next.
+    #[must_use]
     pub fn stride(&self) -> usize {
         self.stride
     }
